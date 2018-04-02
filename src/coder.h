@@ -12,4 +12,4 @@ typedef struct {
 } CodeUnits;
 
 
-int encode(uint32_t code_point, CodeUnits *code_units);
+int encode (uint32_t code_point, CodeUnits *code_units);

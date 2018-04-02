@@ -8,9 +8,11 @@ int main ()
 	system ("clear");
 
 	uint32_t a = 0;
-	printf("Enter the value: \n");
-	scanf("%u", &a);
 	CodeUnits *b = NULL;
+
+	printf ("Enter the value: \n");
+	scanf ("%u", &a);
+	printf ("\n");
 
 	encode (a, b);
 
