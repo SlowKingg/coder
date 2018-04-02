@@ -1,26 +1,25 @@
 
+#include "theme.h"
 #include "coder.h"
+#include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 
-#define ERROR "\e[31;1;4;2m"
-#define CERROR "\e[0;31;1;4;2m"
-#define CORRECT "\e[32;1;4;2m"
-#define CCORRECT "\e[0;32;1;4;2m"
-#define INFO "\e[36;1;4m"
-#define CINFO "\e[0;36;1;4m"
-#define BOLD "\e[1m"
-#define CBOLD "\e[0;1m"
-#define END "\e[0m"
-
-int encode (uint32_t code_point, CodeUnits *code_units) {
-
-	code_units = malloc (sizeof (CodeUnits));
-
-	if (code_units == NULL) {
-		printf (ERROR "Error of initialization\n" END);
-		return -1;
+void print_code (CodeUnits *code_units)
+{
+	for (int j = 0; j < MaxCodeLength; j++) {
+		for (uint8_t i = 128; i != 0; i = i >> 1){
+			(code_units->code[j] & i) ? printf (CBOLD "1") : printf (CBOLD "0");
+		}
+		(j != (MaxCodeLength - 1)) ? printf (CCORRECT "_") :\
+															printf (END "\n");
 	}
+
+	printf(INFO "Number of bytes in code" CBOLD " %lu\n" END,\
+	 														code_units->length);
+}
+
+int encode (uint32_t code_point, CodeUnits *code_units)
+{
 
 	int sbit = 0;
 	int j = 0;
@@ -69,13 +68,176 @@ int encode (uint32_t code_point, CodeUnits *code_units) {
 		code_units->code[3] = (code_point & 0x3F ) | 0x80;
 	}
 
-	for (j = 0; j < MaxCodeLength; j++) {
-		for (uint8_t i = 128; i != 0; i = i >> 1){
-			(code_units->code[j] & i) ? printf (CBOLD "1") : printf (CBOLD "0");
-		}
-		(j != (MaxCodeLength - 1)) ? printf (CCORRECT "_") :\
-		 												printf (END "\n");
-	}
 
 	return 0;
+}
+
+int read_next_code_unit (FILE *in, CodeUnits *code_units)
+{
+	char *buffer = (char *) calloc (sizeof (char), 9);
+	char *buf = (char *) calloc (sizeof (char), 1);
+
+	do {
+		*buf = fgetc (in);
+		if (*buf == '1' || *buf == '0'){
+
+			fseek (in, -1, SEEK_CUR);
+			if (fgets (buffer, 9, in) == NULL) {
+				free (buffer);
+				free (buf);
+				return -1;
+			}
+
+			if (*buffer == '1' && buffer[1] == '0') {
+				continue;
+			}
+
+			if (buffer[0] == '0') {
+
+				code_units->length = 1;
+
+				for (int j = 0; j < code_units->length; j++) {
+					for (int i = 0; i < 8; i++) {
+						if (buffer [i + j * 8] == '1') {
+							code_units->code[j] = (code_units->code[j] << 1)\
+							 												| 1;
+						} else {
+							code_units->code[j] = code_units->code[j] << 1;
+						}
+					}
+				}
+
+				free (buffer);
+				free (buf);
+				return 0;
+			}
+
+			if ((strncmp (buffer, "11", 2) == 0) && buffer[2] == '0') {
+				char code [16];
+
+				memcpy(code, buffer, 8);
+
+				fseek (in, 1, SEEK_CUR);
+				if (fgets (buffer, 9, in) == NULL) {
+					free (buffer);
+					free (buf);
+					return -1;
+				}
+
+				if (buffer[0] == '1' && buffer[1] == '0') {
+					memcpy(code + 8, buffer, 8);
+				} else {
+					fseek (in, -8, SEEK_CUR);
+					free (buffer);
+					free (buf);
+					return -1;
+				}
+
+				code_units->length = 2;
+
+				for (int j = 0; j < code_units->length; j++) {
+					for (int i = 0; i < 8; i++) {
+						if (code [i + j * 8] == '1') {
+							code_units->code[j] = (code_units->code[j] << 1)\
+							 												| 1;
+						} else {
+							code_units->code[j] = code_units->code[j] << 1;
+						}
+					}
+				}
+
+				free (buffer);
+				free (buf);
+				return 0;
+			}
+
+			if ((strncmp (buffer, "111", 3) == 0) && buffer[3] == '0'){
+				char code [24];
+
+				memcpy(code, buffer, 8);
+
+				for (int i = 1; i <= 2; i++) {
+					fseek (in, 1, SEEK_CUR);
+					if (fgets (buffer, 9, in) == NULL) {
+						free (buffer);
+						free (buf);
+						return -1;
+					}
+
+					if (buffer[0] == '1' && buffer[1] == '0') {
+						memcpy(code + (i*8), buffer, 8);
+					} else {
+						fseek (in, -8, SEEK_CUR);
+						free (buffer);
+						free (buf);
+						return -1;
+					}
+				}
+
+				code_units->length = 3;
+
+				for (int j = 0; j < code_units->length; j++) {
+					for (int i = 0; i < 8; i++) {
+						if (code [i + j * 8] == '1') {
+							code_units->code[j] = (code_units->code[j] << 1)\
+							 												| 1;
+						} else {
+							code_units->code[j] = code_units->code[j] << 1;
+						}
+					}
+				}
+
+				free (buffer);
+				free (buf);
+				return 0;
+			}
+
+			if ((strncmp (buffer, "1111", 4) == 0) && buffer[4] == '0'){
+
+				char code[32];
+
+				memcpy(code, buffer, 8);
+
+				for (int i = 1; i <= 3; i++) {
+					fseek (in, 1, SEEK_CUR);
+					if (fgets (buffer, 9, in) == NULL) {
+						free (buffer);
+						free (buf);
+						return -1;
+					}
+
+					if (buffer[0] == '1' && buffer[1] == '0') {
+						memcpy(code + (i*8), buffer, 8);
+					} else {
+						fseek (in, -8, SEEK_CUR);
+						free (buffer);
+						free (buf);
+						return -1;
+					}
+				}
+
+				code_units->length = 4;
+
+				for (int j = 0; j < code_units->length; j++) {
+					for (int i = 0; i < 8; i++) {
+						if (code [i + j * 8] == '1') {
+							code_units->code[j] = (code_units->code[j] << 1)\
+																			| 1;
+						} else {
+							code_units->code[j] = code_units->code[j] << 1;
+						}
+					}
+				}
+
+				free (buffer);
+				free (buf);
+				return 0;
+			}
+
+		}
+	} while (*buf != EOF);
+
+	free (buffer);
+	free (buf);
+	return -2;
 }

@@ -1,0 +1,10 @@
+
+#define ERROR "\e[31;1;4;2m"
+#define CERROR "\e[0;31;1;4;2m"
+#define CORRECT "\e[32;1;4;2m"
+#define CCORRECT "\e[0;32;1;4;2m"
+#define INFO "\e[36;1;4m"
+#define CINFO "\e[0;36;1;4m"
+#define BOLD "\e[1m"
+#define CBOLD "\e[0;1m"
+#define END "\e[0m"
