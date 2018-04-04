@@ -6,6 +6,7 @@
 int main (){
 	system ("clear");
 
+	uint32_t num = 0;
 	CodeUnits *b = malloc (sizeof (CodeUnits));
 	FILE *in;
 
@@ -16,10 +17,14 @@ int main (){
 		return -1;
 	}
 
+
+
 	for (int a = 0; a != 1;) {
 		a = read_next_code_unit (in, b);
 		if (a == 0) {
 			print_code (b);
+			num = decode (b);
+			printf(INFO "The decoded code is" CBOLD " %i\n\n" END, num);
 		} else if (a == -1) {
 			printf(ERROR "ERROR\n" END);
 		} else if (a == -2) {

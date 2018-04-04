@@ -14,7 +14,7 @@ void print_code (CodeUnits *code_units)
 															printf (END "\n");
 	}
 
-	printf(INFO "Number of bytes in code" CBOLD " %lu\n" END,\
+	printf(INFO "Number of bytes in code:" CBOLD " %lu\n" END,\
 	 														code_units->length);
 }
 
@@ -37,8 +37,6 @@ int encode (uint32_t code_point, CodeUnits *code_units)
 		}
 	}
 
-	printf (INFO "Number of significant bits:" CBOLD " %d\n" END, sbit);
-
 	if (sbit <= 7) {
 		code_units->length = 1;
 		} else if (sbit > 7 && sbit <= 11 ) {
@@ -48,9 +46,6 @@ int encode (uint32_t code_point, CodeUnits *code_units)
 		} else if (sbit > 16 && sbit <= 21 ) {
 		code_units->length = 4;
 	}
-
-	printf (INFO "Number of bytes in the code:" CBOLD " %lu\n" END,\
-	 													code_units->length);
 
 	if (code_units->length == 1) {
 		code_units->code[0] = code_point & 0x7F;
@@ -240,4 +235,42 @@ int read_next_code_unit (FILE *in, CodeUnits *code_units)
 	free (buffer);
 	free (buf);
 	return -2;
+}
+
+uint32_t decode (const CodeUnits *code_units)
+{
+	uint32_t code_point = 0;
+
+	if (code_units->length == 1) {
+		code_point = code_point | code_units->code [0];
+	} else if (code_units->length == 2) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0x1F);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	} else if (code_units->length == 3) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0xF);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	} else if (code_units->length == 4) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0x7);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	}
+
+	return code_point;
 }
