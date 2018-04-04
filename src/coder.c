@@ -18,6 +18,44 @@ void print_code (CodeUnits *code_units)
 	 														code_units->length);
 }
 
+uint32_t decode (const CodeUnits *code_units)
+{
+	uint32_t code_point = 0;
+
+	if (code_units->length == 1) {
+		code_point = code_point | code_units->code [0];
+	} else if (code_units->length == 2) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0x1F);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	} else if (code_units->length == 3) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0xF);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	} else if (code_units->length == 4) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (i == 0) {
+				code_point = code_point | (code_units->code [i] & 0x7);
+			} else {
+				code_point = code_point << 6;
+				code_point = code_point | (code_units->code [i] & 0x3F);
+			}
+		}
+	}
+
+	return code_point;
+}
+
 int encode (uint32_t code_point, CodeUnits *code_units)
 {
 
@@ -63,238 +101,6 @@ int encode (uint32_t code_point, CodeUnits *code_units)
 		code_units->code[3] = (code_point & 0x3F ) | 0x80;
 	}
 
-
-	return 0;
-}
-
-int read_next_code_unit (FILE *in, CodeUnits *code_units)
-{
-	char *buffer = (char *) calloc (sizeof (char), 9);
-	char *buf = (char *) calloc (sizeof (char), 1);
-
-	do {
-		*buf = fgetc (in);
-		if (*buf == '1' || *buf == '0'){
-
-			fseek (in, -1, SEEK_CUR);
-			if (fgets (buffer, 9, in) == NULL) {
-				free (buffer);
-				free (buf);
-				return -1;
-			}
-
-			if (*buffer == '1' && buffer[1] == '0') {
-				continue;
-			}
-
-			if (buffer[0] == '0') {
-
-				code_units->length = 1;
-
-				for (int j = 0; j < code_units->length; j++) {
-					for (int i = 0; i < 8; i++) {
-						if (buffer [i + j * 8] == '1') {
-							code_units->code[j] = (code_units->code[j] << 1)\
-							 												| 1;
-						} else {
-							code_units->code[j] = code_units->code[j] << 1;
-						}
-					}
-				}
-
-				free (buffer);
-				free (buf);
-				return 0;
-			}
-
-			if ((strncmp (buffer, "11", 2) == 0) && buffer[2] == '0') {
-				char code [16];
-
-				memcpy(code, buffer, 8);
-
-				fseek (in, 1, SEEK_CUR);
-				if (fgets (buffer, 9, in) == NULL) {
-					free (buffer);
-					free (buf);
-					return -1;
-				}
-
-				if (buffer[0] == '1' && buffer[1] == '0') {
-					memcpy(code + 8, buffer, 8);
-				} else {
-					fseek (in, -8, SEEK_CUR);
-					free (buffer);
-					free (buf);
-					return -1;
-				}
-
-				code_units->length = 2;
-
-				for (int j = 0; j < code_units->length; j++) {
-					for (int i = 0; i < 8; i++) {
-						if (code [i + j * 8] == '1') {
-							code_units->code[j] = (code_units->code[j] << 1)\
-							 												| 1;
-						} else {
-							code_units->code[j] = code_units->code[j] << 1;
-						}
-					}
-				}
-
-				free (buffer);
-				free (buf);
-				return 0;
-			}
-
-			if ((strncmp (buffer, "111", 3) == 0) && buffer[3] == '0'){
-				char code [24];
-
-				memcpy(code, buffer, 8);
-
-				for (int i = 1; i <= 2; i++) {
-					fseek (in, 1, SEEK_CUR);
-					if (fgets (buffer, 9, in) == NULL) {
-						free (buffer);
-						free (buf);
-						return -1;
-					}
-
-					if (buffer[0] == '1' && buffer[1] == '0') {
-						memcpy(code + (i*8), buffer, 8);
-					} else {
-						fseek (in, -8, SEEK_CUR);
-						free (buffer);
-						free (buf);
-						return -1;
-					}
-				}
-
-				code_units->length = 3;
-
-				for (int j = 0; j < code_units->length; j++) {
-					for (int i = 0; i < 8; i++) {
-						if (code [i + j * 8] == '1') {
-							code_units->code[j] = (code_units->code[j] << 1)\
-							 												| 1;
-						} else {
-							code_units->code[j] = code_units->code[j] << 1;
-						}
-					}
-				}
-
-				free (buffer);
-				free (buf);
-				return 0;
-			}
-
-			if ((strncmp (buffer, "1111", 4) == 0) && buffer[4] == '0'){
-
-				char code[32];
-
-				memcpy(code, buffer, 8);
-
-				for (int i = 1; i <= 3; i++) {
-					fseek (in, 1, SEEK_CUR);
-					if (fgets (buffer, 9, in) == NULL) {
-						free (buffer);
-						free (buf);
-						return -1;
-					}
-
-					if (buffer[0] == '1' && buffer[1] == '0') {
-						memcpy(code + (i*8), buffer, 8);
-					} else {
-						fseek (in, -8, SEEK_CUR);
-						free (buffer);
-						free (buf);
-						return -1;
-					}
-				}
-
-				code_units->length = 4;
-
-				for (int j = 0; j < code_units->length; j++) {
-					for (int i = 0; i < 8; i++) {
-						if (code [i + j * 8] == '1') {
-							code_units->code[j] = (code_units->code[j] << 1)\
-																			| 1;
-						} else {
-							code_units->code[j] = code_units->code[j] << 1;
-						}
-					}
-				}
-
-				free (buffer);
-				free (buf);
-				return 0;
-			}
-
-		}
-	} while (*buf != EOF);
-
-	free (buffer);
-	free (buf);
-	return -2;
-}
-
-uint32_t decode (const CodeUnits *code_units)
-{
-	uint32_t code_point = 0;
-
-	if (code_units->length == 1) {
-		code_point = code_point | code_units->code [0];
-	} else if (code_units->length == 2) {
-		for (int i = 0; i < code_units->length; i++) {
-			if (i == 0) {
-				code_point = code_point | (code_units->code [i] & 0x1F);
-			} else {
-				code_point = code_point << 6;
-				code_point = code_point | (code_units->code [i] & 0x3F);
-			}
-		}
-	} else if (code_units->length == 3) {
-		for (int i = 0; i < code_units->length; i++) {
-			if (i == 0) {
-				code_point = code_point | (code_units->code [i] & 0xF);
-			} else {
-				code_point = code_point << 6;
-				code_point = code_point | (code_units->code [i] & 0x3F);
-			}
-		}
-	} else if (code_units->length == 4) {
-		for (int i = 0; i < code_units->length; i++) {
-			if (i == 0) {
-				code_point = code_point | (code_units->code [i] & 0x7);
-			} else {
-				code_point = code_point << 6;
-				code_point = code_point | (code_units->code [i] & 0x3F);
-			}
-		}
-	}
-
-	return code_point;
-}
-
-int write_code_unit (FILE *out, const CodeUnits *code_units)
-{
-	for (int j = 0; j < code_units->length; j++) {
-		for (uint8_t i = 128; i != 0; i = i >> 1){
-			(code_units->code[j] & i) ? fputc ('1', out) : fputc ('0', out);
-
-			if ( ferror (out)) {
-				return -1;
-			} else {
-				continue;
-			}
-		}
-		(j != (code_units->length - 1)) ? fputc (' ', out) : fputc ('\n', out);
-
-		if ( ferror (out)) {
-			return -1;
-		} else {
-			continue;
-		}
-	}
 
 	return 0;
 }
