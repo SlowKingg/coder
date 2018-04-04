@@ -274,3 +274,27 @@ uint32_t decode (const CodeUnits *code_units)
 
 	return code_point;
 }
+
+int write_code_unit (FILE *out, const CodeUnits *code_units)
+{
+	for (int j = 0; j < code_units->length; j++) {
+		for (uint8_t i = 128; i != 0; i = i >> 1){
+			(code_units->code[j] & i) ? fputc ('1', out) : fputc ('0', out);
+
+			if ( ferror (out)) {
+				return -1;
+			} else {
+				continue;
+			}
+		}
+		(j != (code_units->length - 1)) ? fputc (' ', out) : fputc ('\n', out);
+
+		if ( ferror (out)) {
+			return -1;
+		} else {
+			continue;
+		}
+	}
+
+	return 0;
+}
