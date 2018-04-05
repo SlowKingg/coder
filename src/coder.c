@@ -328,3 +328,82 @@ int read_next_code_unit (FILE *in, CodeUnits *code_units) {
 
 	return -1;
 }
+
+int write_code_unit (FILE *out, const CodeUnits *code_units) {
+
+	int exflag = -1;
+
+	if (exflag == -1) {
+		char path [255];
+		char lnk [255];
+		int fno;
+		ssize_t r;
+
+		if (out != NULL) {
+			fno = fileno(out);
+
+			sprintf(lnk, "/proc/self/fd/%d", fno);
+
+			r = readlink(lnk, path, 255);
+
+			if (r < 0) {
+				printf("failed to readlink\n");
+				return -1;
+			}
+
+			path[r] = '\0';
+		}
+
+		if (strstr (path, ".txt\0") != NULL) {
+			exflag = 1;
+		} else if (strstr (path, ".bin\0") != NULL) {
+			exflag = 0;
+		} else {
+			return -1;
+		}
+	}
+
+	if (exflag == 1) {
+		uint32_t code_point = 0;
+
+		code_point = decode (code_units);
+
+		fprintf(out, "%x\n", code_point);
+
+		return 0;
+	}
+
+	if (exflag == 0) {
+		if (code_units->length == 1) {
+			fwrite (&code_units->code[0], 1, 1, out);
+
+			return 0;
+		} else if (code_units->length == 2) {
+			for (int i = 0; i < code_units->length; i++) {
+				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+					return -1;
+				}
+			}
+
+			return 0;
+		} else if (code_units->length == 3) {
+			for (int i = 0; i < code_units->length; i++) {
+				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+					return -1;
+				}
+			}
+
+			return 0;
+		} else if (code_units->length == 4) {
+			for (int i = 0; i < code_units->length; i++) {
+				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+					return -1;
+				}
+			}
+
+			return 0;
+		}
+	}
+
+	return -1;
+}

@@ -14,8 +14,10 @@ int main (){
 
 	FILE *inb;
 	FILE *intext;
+	FILE *outb;
+	FILE *outtext;
 
-	inb = fopen ("out.bin", "rb");
+	inb = fopen ("testin.bin", "rb");
 	if (inb == NULL) {
 		printf (ERROR "Can't open input file(BIN)\n" END);
 		return -1;
@@ -27,12 +29,25 @@ int main (){
 		return -1;
 	}
 
-	printf(INFO "\t\n***BIN***\n\n" END);
+	outtext = fopen ("testout.txt", "wt");
+	if (intext == NULL) {
+		printf (ERROR "Can't open output file(TXT)\n" END);
+		return -1;
+	}
+
+	outb = fopen ("testout.bin", "wt");
+	if (intext == NULL) {
+		printf (ERROR "Can't open output file(BIN)\n" END);
+		return -1;
+	}
+
 
 	for (int a = 0;;) {
 		a = read_next_code_unit (inb, b);
 		if (a == 0) {
-			print_code (b);
+			if (write_code_unit (outb, b)) {
+				printf(ERROR "OUTPUT ERROR BIN\n" END);
+			}
 		} else if (a == -1) {
 			printf(ERROR "ERROR BIN\n" END);
 			break;
@@ -42,17 +57,17 @@ int main (){
 		}
 	}
 
-	printf(INFO "\t\n***TEXT***\n\n" END);
-
 	for (int a = 0;;) {
 		a = read_next_code_unit (intext, b);
 		if (a == 0) {
-			print_code (b);
+			if (write_code_unit (outtext, b)) {
+				printf(ERROR "OUTPUT ERROR TXT\n" END);
+			}
 		} else if (a == -1) {
-			printf(ERROR "ERROR BIN\n" END);
+			printf(ERROR "ERROR TXT\n" END);
 			break;
 		} else if (a == -2) {
-			printf(INFO "EOF OF BIN\n" END);
+			printf(INFO "EOF OF TXT\n" END);
 			break;
 		}
 	}
@@ -63,6 +78,14 @@ int main (){
 
 	if (fclose (intext)) {
 		printf (ERROR "Can't properly close input file(TXT)\n" END);
+	}
+
+	if (fclose (outtext)) {
+		printf (ERROR "Can't properly close output file(TXT)\n" END);
+	}
+
+	if (fclose (outb)) {
+		printf (ERROR "Can't properly close output file(BIN)\n" END);
 	}
 
 	return 0;
