@@ -1,4 +1,4 @@
-
+#define _BSD_SOURCE
 #include "theme.h"
 #include "coder.h"
 #include <string.h>
