@@ -1,4 +1,3 @@
-#define _BSD_SOURCE
 #include "theme.h"
 #include "coder.h"
 #include <string.h>
@@ -112,297 +111,178 @@ int encode (uint32_t code_point, CodeUnits *code_units)
 
 int read_next_code_unit (FILE *in, CodeUnits *code_units) {
 
-	int exflag = -1;
+	CodeUnits *form = calloc (sizeof (CodeUnits), 1);
+	if (form == NULL) {
+		return -1;
+	}
 
-	if (exflag == -1) {
-		char path [255];
-    	char lnk [255];
-    	int fno;
-    	ssize_t r;
+	uint8_t *byte = calloc (sizeof (uint8_t), 1);
 
-    	if (in != NULL) {
-    		fno = fileno(in);
+	read: if (fread (byte, sizeof (uint8_t), 1, in) != 1) {
+		if (feof (in)) {
+			free (byte);
+			free (form);
+			return -2;
+		}
 
-        	sprintf(lnk, "/proc/self/fd/%d", fno);
-
-        	r = readlink(lnk, path, 255);
-
-    		if (r < 0) {
-            	printf("failed to readlink\n");
-            	return -1;
-        	}
-
-        	path[r] = '\0';
-    	}
-
-    	if (strstr (path, ".txt\0") != NULL) {
-			exflag = 1;
-		} else if (strstr (path, ".bin\0") != NULL) {
-			exflag = 0;
-		} else {
-    		return -1;
+		if (ferror (in)) {
+			free (byte);
+			free (form);
+			return -1;
 		}
 	}
 
-	if (exflag == 1) {
-
-		char ch;
-
-		do {
-			ch = getc (in);
-
-			if (ch == EOF) {
-				return -2;
-			}
-		} while (ch == ' ' || ch == '\n');
-
-		if (fseek (in, -1, SEEK_CUR)) {
-			return -1;
-		}
-
-		char code [8];
-		uint32_t num;
-
-		if (fgets (code, 8, in) == NULL) {
-			if (feof (in)) {
-				return -2;
-			}
-
-			if (ferror (in)) {
-				return -1;
-			}
-		}
-
-		num = strtol (code, NULL, 16);
-
-		if (encode (num, code_units)) {
-			return -1;
-		}
-
-		return 0;
+	if ((*byte & 0xc0) == 0x80) {
+		goto read;
 	}
 
-	if (exflag == 0) {
+	if ((*byte & 0x80) == 0) {
+		form->code [0] = *byte;
+		form->length = 1;
+	} else if ((*byte & 0xe0) == 0xc0) {
+		form->code [0] = *byte;
+		form->length = 2;
 
-		CodeUnits *form = calloc (sizeof (CodeUnits), 1);
-		if (form == NULL) {
+		uint8_t *cont = calloc (sizeof (uint8_t), 1);
+		if (cont == NULL) {
 			return -1;
 		}
 
-		uint8_t *byte = calloc (sizeof (uint8_t), 1);
-
-		read: if (fread (byte, sizeof (uint8_t), 1, in) != 1) {
-			if (feof (in)) {
-				free (byte);
-				free (form);
-				return -2;
+		for (int i = 1; i < form->length; i++) {
+			if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
+				if (feof (in)) {
+					free (byte);
+					free (form);
+					return -2;
+				}
+				if (ferror (in)) {
+					free (byte);
+					free (form);
+					return -1;
+				}
 			}
-
-			if (ferror (in)) {
-				free (byte);
-				free (form);
-				return -1;
+			
+			if ((*cont & 0xc0) == 0x80) {
+				form->code [i] = *cont;
+			} else {
+				if (fseek (in, -1, SEEK_CUR)) {
+					free (byte);
+					free (form);
+					return -1;
+				}
+				goto read;
 			}
 		}
+	} else if ((*byte & 0xf0) == 0xe0) {
+		form->code [0] = *byte;
+		form->length = 3;
 
-		if ((*byte & 0xc0) == 0x80) {
-			goto read;
+		uint8_t *cont = calloc (sizeof (uint8_t), 1);
+		if (cont == NULL) {
+			return -1;
 		}
 
-		if ((*byte & 0x80) == 0) {
-			form->code [0] = *byte;
-			form->length = 1;
-		} else if ((*byte & 0xe0) == 0xc0) {
-			form->code [0] = *byte;
-			form->length = 2;
-
-			uint8_t *cont = calloc (sizeof (uint8_t), 1);
-			if (cont == NULL) {
-				return -1;
-			}
-
-			for (int i = 1; i < form->length; i++) {
-				if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
-					if (feof (in)) {
-						free (byte);
-						free (form);
-						return -2;
-					}
-					if (ferror (in)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
+		for (int i = 1; i < form->length; i++) {
+			if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
+				if (feof (in)) {
+					free (byte);
+					free (form);
+					return -2;
 				}
-
-				if ((*cont & 0xc0) == 0x80) {
-					form->code [i] = *cont;
-				} else {
-					if (fseek (in, -1, SEEK_CUR)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
-					goto read;
+				if (ferror (in)) {
+					free (byte);
+					free (form);
+					return -1;
 				}
 			}
-		} else if ((*byte & 0xf0) == 0xe0) {
-			form->code [0] = *byte;
-			form->length = 3;
 
-			uint8_t *cont = calloc (sizeof (uint8_t), 1);
-			if (cont == NULL) {
-				return -1;
-			}
-
-			for (int i = 1; i < form->length; i++) {
-				if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
-					if (feof (in)) {
-						free (byte);
-						free (form);
-						return -2;
-					}
-					if (ferror (in)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
+			if ((*cont & 0xc0) == 0x80) {
+				form->code [i] = *cont;
+			} else {
+				if (fseek (in, -1, SEEK_CUR)) {
+					free (byte);
+					free (form);
+					return -1;
 				}
-
-				if ((*cont & 0xc0) == 0x80) {
-					form->code [i] = *cont;
-				} else {
-					if (fseek (in, -1, SEEK_CUR)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
-					goto read;
-				}
-			}
-		} else if ((*byte & 0xf8) == 0xf0) {
-			form->code [0] = *byte;
-			form->length = 4;
-
-			uint8_t *cont = calloc (sizeof (uint8_t), 1);
-			if (cont == NULL) {
-				return -1;
-			}
-
-			for (int i = 1; i < form->length; i++) {
-				if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
-					if (feof (in)) {
-						free (byte);
-						free (form);
-						return -2;
-					}
-					if (ferror (in)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
-				}
-
-				if ((*cont & 0xc0) == 0x80) {
-					form->code [i] = *cont;
-				} else {
-					if (fseek (in, -1, SEEK_CUR)) {
-						free (byte);
-						free (form);
-						return -1;
-					}
-					goto read;
-				}
+				goto read;
 			}
 		}
+	} else if ((*byte & 0xf8) == 0xf0) {
+		form->code [0] = *byte;
+		form->length = 4;
 
-		for (int i = 0; i < MaxCodeLength; i++) {
-			code_units->code[i] = form->code[i];
+		uint8_t *cont = calloc (sizeof (uint8_t), 1);
+		if (cont == NULL) {
+			return -1;
 		}
-		code_units->length = form->length;
 
-		free (form);
-		free (byte);
-		return 0;
+		for (int i = 1; i < form->length; i++) {
+			if (fread (cont, sizeof (uint8_t), 1, in) != 1) {
+				if (feof (in)) {
+					free (byte);
+					free (form);
+					return -2;
+				}
+				if (ferror (in)) {
+					free (byte);
+					free (form);
+					return -1;
+				}
+			}
+
+			if ((*cont & 0xc0) == 0x80) {
+				form->code [i] = *cont;
+			} else {
+				if (fseek (in, -1, SEEK_CUR)) {
+					free (byte);
+					free (form);
+					return -1;
+				}
+				goto read;
+			}
+		}
 	}
 
-	return -1;
+	for (int i = 0; i < MaxCodeLength; i++) {
+		code_units->code[i] = form->code[i];
+	}
+	code_units->length = form->length;
+
+	free (form);
+	free (byte);
+	return 0;
 }
 
 int write_code_unit (FILE *out, const CodeUnits *code_units) {
 
-	int exflag = -1;
-
-	if (exflag == -1) {
-		char path [255];
-		char lnk [255];
-		int fno;
-		ssize_t r;
-
-		if (out != NULL) {
-			fno = fileno(out);
-
-			sprintf(lnk, "/proc/self/fd/%d", fno);
-
-			r = readlink(lnk, path, 255);
-
-			if (r < 0) {
-				printf("failed to readlink\n");
-				return -1;
-			}
-
-			path[r] = '\0';
-		}
-
-		if (strstr (path, ".txt\0") != NULL) {
-			exflag = 1;
-		} else if (strstr (path, ".bin\0") != NULL) {
-			exflag = 0;
-		} else {
-			return -1;
-		}
-	}
-
-	if (exflag == 1) {
-		uint32_t code_point = 0;
-
-		code_point = decode (code_units);
-
-		fprintf(out, "%x\n", code_point);
+	if (code_units->length == 1) {
+		fwrite (&code_units->code[0], 1, 1, out);
 
 		return 0;
-	}
-
-	if (exflag == 0) {
-		if (code_units->length == 1) {
-			fwrite (&code_units->code[0], 1, 1, out);
-
-			return 0;
-		} else if (code_units->length == 2) {
-			for (int i = 0; i < code_units->length; i++) {
-				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
-					return -1;
-				}
+	} else if (code_units->length == 2) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+				return -1;
 			}
-
-			return 0;
-		} else if (code_units->length == 3) {
-			for (int i = 0; i < code_units->length; i++) {
-				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
-					return -1;
-				}
-			}
-
-			return 0;
-		} else if (code_units->length == 4) {
-			for (int i = 0; i < code_units->length; i++) {
-				if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
-					return -1;
-				}
-			}
-
-			return 0;
 		}
+
+		return 0;
+	} else if (code_units->length == 3) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+				return -1;
+			}
+		}
+
+		return 0;
+	} else if (code_units->length == 4) {
+		for (int i = 0; i < code_units->length; i++) {
+			if (fwrite (&code_units->code[i], 1, 1, out) != 1) {
+				return -1;
+			}
+		}
+
+		return 0;
 	}
 
 	return -1;

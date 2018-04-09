@@ -1,6 +1,6 @@
 C = gcc
-flag = -c -Wall -Werror -std=c99 -D_POSIX_C_SOURCE=1
-testflag = -Wall -Werror -std=c99 -D_POSIX_C_SOURCE=1 -g -O0
+flag = -c -Wall -Werror -std=c99
+testflag = -Wall -Werror -std=c99 -g -O0
 
 all: coder
 coder: make Main.o Coder.o Command.o
